@@ -1,0 +1,1 @@
+This is a refactor of acurite_decoder from https://github.com/JorjBauer/acurite_decoder with modifications to focus on the Acurite 5 in 1 weather station.
