@@ -3,7 +3,7 @@
 #include "rfDecoders.h"
 #include "Acurite5n1_Decoder.h"
 
-#define VERSION "20180812"
+#define VERSION "20180814"
 
 #define SELPIN 10
 
@@ -21,9 +21,8 @@ Acurite5n1_Decoder Acurite_Decoder;
 // Interupt handler stuff
 #define RX_PIN 14    // 14 == A0. Must be one of the analog pins, b/c of the analog comparator being used.
 
-volatile word pulse_width;  // Length of the current RF pulse off of the RFM69.
-word last_width;            // uS of the last RF pulse
-//word last_poll = 0;       // seems to be not used.
+volatile word pulse_width;  // Length(uS) of the current RF pulse off of the RFM69.
+word last_width;            // Length(uS) of the last RF pulse
 
 ISR(ANALOG_COMP_vect) {
     word now = micros();
@@ -65,6 +64,29 @@ static void runPulseDecoders (volatile word& pulse) {
   }
 }
 
+void outputWeatherDataFast(){
+    Serial.println("**** Message ****");
+    Serial.print("Channel: ");
+    Serial.print(Acurite_Decoder.getChannel());
+    Serial.print("  Sensor ID: ");
+    Serial.print(Acurite_Decoder.getSensorID());
+    Serial.print("  Sequence Num:");
+    Serial.print(Acurite_Decoder.getSequenceNum());
+    Serial.print(" Battery Low?: ");
+    Serial.println(Acurite_Decoder.getBatteryLow());
+    switch (Acurite_Decoder.getMessageType()) {
+        case ACURITE_MSGTYPE_5N1_WINDSPEED_WINDDIR_RAINFALL: 
+            Serial.println("  ACURITE_MSGTYPE_5N1_WINDSPEED_WINDDIR_RAINFALL");
+            break;
+        case ACURITE_MSGTYPE_5N1_WINDSPEED_TEMP_HUMIDITY:
+            Serial.println("  ACURITE_MSGTYPE_5N1_WINDSPEED_TEMP_HUMIDITY");
+            break;
+        default:
+            Serial.println("  Unknown Message Type Received");
+            break;
+    }
+}
+
 void outputWeatherData(){
     Serial.println("**** Message ****");
     Serial.print("Channel: ");
@@ -73,7 +95,7 @@ void outputWeatherData(){
     Serial.print(Acurite_Decoder.getSensorID());
     Serial.print("  Sequence Num:");
     Serial.print(Acurite_Decoder.getSequenceNum());
-    Serial.print("Battery Low?: ");
+    Serial.print(" Battery Low?: ");
     Serial.println(Acurite_Decoder.getBatteryLow());
     switch (Acurite_Decoder.getMessageType()) {
         case ACURITE_MSGTYPE_5N1_WINDSPEED_WINDDIR_RAINFALL: 
@@ -92,13 +114,12 @@ void outputWeatherData(){
             break;
         case ACURITE_MSGTYPE_5N1_WINDSPEED_TEMP_HUMIDITY:
             Serial.println("  ACURITE_MSGTYPE_5N1_WINDSPEED_TEMP_HUMIDITY");
-            Serial.println("  ACURITE_MSGTYPE_5N1_WINDSPEED_WINDDIR_RAINFALL");
             Serial.print("Wind Speed (MPH): ");
             Serial.println(Acurite_Decoder.getWindSpeed_mph());
             Serial.print("Temperature: ");
             Serial.print(Acurite_Decoder.getTemp());
             Serial.print(" Humidity: ");
-            Serial.print(Acurite_Decoder.getHumidity());
+            Serial.println(Acurite_Decoder.getHumidity());
             break;
         default: 
             Serial.println("  Unknown Message Type Received");
@@ -122,7 +143,14 @@ void setup () {
 
 void loop () {
     runPulseDecoders(pulse_width);
+
+    word priorToCall = micros();
     if (Acurite_Decoder.processMessage()) {
-        outputWeatherData();
+        word afterCall = micros();
+        word diff = afterCall - priorToCall;
+        Serial.print("call to Acurite_Decoder.processMessage() took ");
+        Serial.print(diff);
+        Serial.println(" microseconds.");
+        outputWeatherDataFast();
     }
 }

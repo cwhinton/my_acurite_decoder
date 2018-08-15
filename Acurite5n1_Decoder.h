@@ -29,7 +29,7 @@ class Acurite5n1_Decoder
         float getWindDirection();
         uint8_t getMessageType();
         uint8_t getSequenceNum();
-        int getBatteryLow();
+        char getBatteryLow();
 
     private:
         byte packetBuffer[60], packetFill;

@@ -173,8 +173,9 @@ void Acurite5n1_Decoder::setSequenceNum(uint8_t byte){
     sequenceNum = (byte & 0x30) >> 4;
 }
 
-int Acurite5n1_Decoder::getBatteryLow(){
-    return batteryLow;
+char Acurite5n1_Decoder::getBatteryLow(){
+    char lowLetter[2] = {'Y','N'}; 
+    return lowLetter[batteryLow];
 }
 
 void Acurite5n1_Decoder::setBatteryLow(uint8_t byte) {
