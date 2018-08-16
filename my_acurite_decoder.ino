@@ -22,12 +22,12 @@ Acurite5n1_Decoder Acurite_Decoder;
 #define RX_PIN 14    // 14 == A0. Must be one of the analog pins, b/c of the analog comparator being used.
 
 volatile word pulse_width;  // Length(uS) of the current RF pulse off of the RFM69.
-word last_width;            // Length(uS) of the last RF pulse
+word last_pulse = micros();            // uS of the last RF pulse
 
 ISR(ANALOG_COMP_vect) {
     word now = micros();
     pulse_width = now - last_width;
-    last_width = now;
+    last_pulse = now;
 }
 
 static void setupPinChangeInterrupt () {
@@ -46,20 +46,21 @@ static void setupPinChangeInterrupt () {
 // Runs the RF pulse detector in AcuRite5N1Decoder.  AcuRite5N1Decoder is 
 // responsible for decoding the physical transport based upon the interrupts
 // from the RFM69 receiver.
-static void runPulseDecoders (volatile word& pulse) {
+static void runPulseDecoders (volatile word& pulse, bool firstPulse) {
   // get next pulse with and reset it - need to protect against interrupts
   cli();
-  word p = pulse;
+  word pulseWidth = pulse;
   pulse = 0;
   sei();
 
   // if we had a pulse, go through each of the decoders
-  if (p != 0) { 
-    if (adx.nextPulse(p)) {
+  if (pulseWidth != 0) { 
+    if (adx.nextPulse(pulseWidth)) {
       byte size;
       const byte *data = adx.getData(size);
       Acurite_Decoder.addData(data, size);
       adx.resetDecoder();
+      firstPulse == (pulse_width > 5000000);  // if pulse_width > 5 seconds, it's the first pulse (beginning of message)
     }
   }
 }
@@ -142,15 +143,19 @@ void setup () {
 }
 
 void loop () {
-    runPulseDecoders(pulse_width);
+    bool firstPulse
+    byte msgCounter=4
 
-    word priorToCall = micros();
-    if (Acurite_Decoder.processMessage()) {
-        word afterCall = micros();
-        word diff = afterCall - priorToCall;
-        Serial.print("call to Acurite_Decoder.processMessage() took ");
-        Serial.print(diff);
-        Serial.println(" microseconds.");
-        outputWeatherDataFast();
+    runPulseDecoders(pulse_width,firstPulse);
+
+    if (firstPulse)
+        msgCounter = 1;
+    
+    if (msgCounter > 2) {
+        for (int i = 0;i < 3;i++) {
+            if (Acurite_Decoder.processMessage()) {
+                outputWeatherDataFast();
+            }
+        }
     }
 }
