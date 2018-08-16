@@ -135,95 +135,94 @@ public:
 #define NUM_SYNCS 4
 
 class AcuRite5N1DecodeOOK : public DecodeOOK {
- public:
-  AcuRite5N1DecodeOOK () {}
+    public:
+        AcuRite5N1DecodeOOK () {}
 
-  virtual char decode (word width) {
-    char ret = 0;
+    virtual char decode (word width) {
+        char ret = 0;
 
-    if (!width)
-      return -1;
+        if (!width)
+            return -1;
 
-    switch (state) {
-    case UNKNOWN:
-      // 0-to-positive initial transition
-      state = OK;
-      break;
-    case OK:
-      // OK invoked at pos-to-0 transition. Look at width, figure out what 
-      // kind of pulse this is (SYNC/0/1)
+        switch (state) {
+            case UNKNOWN:
+                // 0-to-positive initial transition
+                state = OK;
+                break;
+            case OK:
+                // OK invoked at pos-to-0 transition. Look at width, figure out what 
+                // kind of pulse this is (SYNC/0/1)
 
-      if (width > BIT_WIDTH) {
-	// Dunno what data we have; it's bad.
-	state = UNKNOWN;
-	ret = -1;
-      } else if (width >= SYNC_WIDTH) {
-	// sync bit
-	state = T0; // T0: expecting zero-pulse for SYNC of 584-600mS
-      } else if (width >= ONE_WIDTH) {
-	if (flip != NUM_SYNCS) {
-	  state = T3;
-	  return 0;
-	}
-	state = T1; // T1: expecting zero-pulse for 1-bit of 180-200mS
-      } else if (width >= ZERO_WIDTH) {
-	if (flip != NUM_SYNCS) {
-	  state = T3;
-	  return 0;
-	}
-	state = T2; // T2: expecting zero-pulse for 0-bit of 584-800mS
-      } else {
-        // Again, bad data.
-        state = UNKNOWN;
-        ret = -1;
-      }
-      break;
+                if (width > BIT_WIDTH) {
+                    // Dunno what data we have; it's bad.
+                    state = UNKNOWN;
+                    ret = -1;
+                } else if (width >= SYNC_WIDTH) {
+                        // sync bit
+                        state = T0; // T0: expecting zero-pulse for SYNC of 584-600mS
+                    } else if (width >= ONE_WIDTH) {
+                            if (flip != NUM_SYNCS) {
+                                state = T3;
+                                return 0;
+                            }
+                            state = T1; // T1: expecting zero-pulse for 1-bit of 180-200mS
+                        } else if (width >= ZERO_WIDTH) {
+                                if (flip != NUM_SYNCS) {
+                                    state = T3;
+                                    return 0;
+                                }
+                                state = T2; // T2: expecting zero-pulse for 0-bit of 584-800mS
+                            } else {
+                                // Again, bad data.
+                                state = UNKNOWN;
+                                ret = -1;
+                            }
+                break;
 
-      // States T0 - T2: receiving the zero-pulse half. Set to state = OK
-      // if we receive it as expected, and reset if not?
-    case T0: // Sync bits.
-      if (width > MAX_SYNC_WIDTH) {
-	// reject: the trailing edge is too long, so it's not a sync.
-	state = UNKNOWN;
-	return -1;
-      }
-      if (width < SYNC_WIDTH) {
-	// We might have missed a transition, and this is the start of a 1/0 -
-	// change state, increment sync counter, and re-process it
-	flip++;
-	state = OK;
-	return decode(width);
-      }
+            // States T0 - T2: receiving the zero-pulse half. Set to state = OK
+            // if we receive it as expected, and reset if not?
+            case T0: // Sync bits.
+                if (width > MAX_SYNC_WIDTH) {
+                    // reject: the trailing edge is too long, so it's not a sync.
+                    state = UNKNOWN;
+                    return -1;
+                }
+                if (width < SYNC_WIDTH) {
+                    // We might have missed a transition, and this is the start of a 1/0 -
+                    // change state, increment sync counter, and re-process it
+                    flip++;
+                    state = OK;
+                    return decode(width);
+                }
 
-      flip++; // use flip to count sync bits
-      state = OK;
-      break;
-    case T1:
-	gotBit(1);
-	if (pos >= (ACURITE_5N1_BITLEN / 8)) {
-	  // Data ready to receive - packets are 7 bytes long
-	  reverseBits();
-	  return 1;
-	}
-
-	break;
-    case T2:
-      gotBit(0);
+                flip++; // use flip to count sync bits
+                state = OK;
+                break;
+            case T1:
+                gotBit(1);
+                if (pos >= (ACURITE_5N1_BITLEN / 8)) {
+                    // Data ready to receive - packets are 7 bytes long
+                    reverseBits();
+                    return 1;
+                }
+                break;
+            case T2:
+                gotBit(0);
       
-      if (pos >= (ACURITE_5N1_BITLEN / 8)) {
-	// Data ready to receive - packets are 7 bytes long
-	reverseBits();
-	return 1;
-      }
-      break;
-    case T3:
-      // error condition; consume the 0-bit and then reset
-      return -1;
-      break;
-    }
+                if (pos >= (ACURITE_5N1_BITLEN / 8)) {
+                    // Data ready to receive - packets are 7 bytes long
+                    reverseBits();
+                    return 1;
+                }
+                break;
+            case T3:
+                // error condition; consume the 0-bit and then reset
+                return -1;
+                break;
+        }
 
-    return ret;
-  }
+        return ret;
+    }
 
 };
 
