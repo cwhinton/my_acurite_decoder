@@ -26,7 +26,7 @@ word last_pulse = micros();            // uS of the last RF pulse
 
 ISR(ANALOG_COMP_vect) {
     word now = micros();
-    pulse_width = now - last_width;
+    pulse_width = now - last_pulse;
     last_pulse = now;
 }
 
@@ -143,8 +143,8 @@ void setup () {
 }
 
 void loop () {
-    bool firstPulse
-    byte msgCounter=4
+    bool firstPulse;
+    byte msgCounter=4;
 
     runPulseDecoders(pulse_width,firstPulse);
 
