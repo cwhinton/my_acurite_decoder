@@ -17,12 +17,12 @@ class Acurite5n1_Decoder
         byte calcParity (byte b);
         bool processMessage();
 
-        float getTemp();
-        float getWindSpeed_kph();
-        float getWindSpeed_mph();
+        int getTemp();
+        byte getWindSpeed_kph();
+        byte getWindSpeed_mph();
         uint8_t getHumidity();
         int getRainCounter();
-        float getRainFall();
+        int getRainFall();
         char getChannel();
         uint16_t getSensorID();
         char * getWindDirectionStr();
@@ -74,12 +74,12 @@ class Acurite5n1_Decoder
             22.5,  // e - NNE
             180.0, // f - S
         };
-        float temp_F, wind_dird, rainfall = 0.0, wind_speed_kph;
+        int tempF, wind_speed_kph, rainfall;
+        float temp_F, wind_dird;
         uint8_t humidity, messageType, sequenceNum, windDirectionIX;
         char *wind_dirstr = "";
-//        char channel_str[2];
         uint16_t sensorID;
-        int raincounter, temp, batteryLow,channelNum;
+        int raincounter, batteryLow,channelNum;
         int priorRainCounter = 0;
 
         float kph2mph(float kmph);

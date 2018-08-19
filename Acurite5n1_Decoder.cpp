@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <math.h>
 #include "Acurite5n1_Decoder.h";
 //#include <Strings.h>
 
@@ -50,8 +51,8 @@ float Acurite5n1_Decoder::kph2mph(float kmph) {
   return kmph / 1.609344;
 }
 
-float Acurite5n1_Decoder::getTemp(){
-    return temp_F;
+int Acurite5n1_Decoder::getTemp(){
+    return tempF;
 }
 
 void Acurite5n1_Decoder::setTemp(uint8_t highByte, uint8_t lowByte){
@@ -59,15 +60,16 @@ void Acurite5n1_Decoder::setTemp(uint8_t highByte, uint8_t lowByte){
     int highbits = (highByte & 0x0F) << 7 ;
     int lowbits = lowByte & 0x7F;
     int rawtemp = highbits | lowbits;
-    temp_F = (rawtemp - 400) / 10.0;
+//    temp_F = (rawtemp - 400) / 10.0;
+    tempF = rawtemp - 400;
 }
 
-float Acurite5n1_Decoder::getWindSpeed_kph(){
+byte Acurite5n1_Decoder::getWindSpeed_kph(){
     return wind_speed_kph;
 }
 
-float Acurite5n1_Decoder::getWindSpeed_mph(){
-    return kph2mph(getWindSpeed_kph());
+byte Acurite5n1_Decoder::getWindSpeed_mph(){
+    return round(kph2mph(getWindSpeed_kph()));
 }
 
 void Acurite5n1_Decoder::setWindSpeed_kph (uint8_t highByte, uint8_t lowByte){
@@ -79,7 +81,7 @@ void Acurite5n1_Decoder::setWindSpeed_kph (uint8_t highByte, uint8_t lowByte){
     int rawspeed = highbits | lowbits;
     wind_speed_kph = 0;
     if (rawspeed > 0) {
-        wind_speed_kph = rawspeed * 0.8278 + 1.0;
+        wind_speed_kph = round(rawspeed * 0.8278 + 1.0);
     } 
 }
 
@@ -101,7 +103,7 @@ void Acurite5n1_Decoder::setRainCounter(uint8_t highByte, uint8_t lowByte){
 	raincounter = ((highByte & 0x7f) << 7) | (lowByte & 0x7F);
     if (priorRainCounter > 0) {
         // track rainfall difference after first run
-        rainfall = (raincounter - priorRainCounter) * 0.01;
+        rainfall = raincounter - priorRainCounter;
         if (raincounter < priorRainCounter) {
             priorRainCounter = raincounter;
         }
@@ -111,7 +113,7 @@ void Acurite5n1_Decoder::setRainCounter(uint8_t highByte, uint8_t lowByte){
     }
 }
 
-float Acurite5n1_Decoder::getRainFall(){
+int Acurite5n1_Decoder::getRainFall(){
     return rainfall;
 }
 
