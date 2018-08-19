@@ -1,13 +1,25 @@
 #include <Arduino.h>
+#include <Wire.h>
 #include "RFM69_Helper.h"
 #include "rfDecoders.h"
 #include "Acurite5n1_Decoder.h"
 
-#define VERSION "20180814"
+#define VERSION "20180819"
 
 #define SELPIN 10
 
+#define I2C_ADDRESS 23
+
 RFM69_Helper rfm69(SELPIN);
+
+struct WEATHER_BUFFER{
+    char buffer[30];
+};
+
+WEATHER_BUFFER  weatherBuffer[2];
+byte currentBufferIDX = 0;
+volatile byte safeBufferIDX = 0;
+
 
 //
 // AcuRite5N1Decoder manages the decoding of the physical layer
@@ -46,7 +58,7 @@ static void setupPinChangeInterrupt () {
 // Runs the RF pulse detector in AcuRite5N1Decoder.  AcuRite5N1Decoder is 
 // responsible for decoding the physical transport based upon the interrupts
 // from the RFM69 receiver.
-static void runPulseDecoders (volatile word& pulse, bool firstPulse) {
+static void runPulseDecoders (volatile word& pulse) {
   // get next pulse with and reset it - need to protect against interrupts
   cli();
   word pulseWidth = pulse;
@@ -60,12 +72,12 @@ static void runPulseDecoders (volatile word& pulse, bool firstPulse) {
       const byte *data = adx.getData(size);
       Acurite_Decoder.addData(data, size);
       adx.resetDecoder();
-      firstPulse == (pulse_width > 5000000);  // if pulse_width > 5 seconds, it's the first pulse (beginning of message)
     }
   }
 }
 
-void outputWeatherDataFast(){
+/*
+void outputWeatherDataHeader(){
     Serial.println("**** Message ****");
     Serial.print("Channel: ");
     Serial.print(Acurite_Decoder.getChannel());
@@ -89,18 +101,9 @@ void outputWeatherDataFast(){
 }
 
 void outputWeatherData(){
-    Serial.println("**** Message ****");
-    Serial.print("Channel: ");
-    Serial.print(Acurite_Decoder.getChannel());
-    Serial.print("  Sensor ID: ");
-    Serial.print(Acurite_Decoder.getSensorID());
-    Serial.print("  Sequence Num:");
-    Serial.print(Acurite_Decoder.getSequenceNum());
-    Serial.print(" Battery Low?: ");
-    Serial.println(Acurite_Decoder.getBatteryLow());
+    outputWeatherDataHeader();
     switch (Acurite_Decoder.getMessageType()) {
         case ACURITE_MSGTYPE_5N1_WINDSPEED_WINDDIR_RAINFALL: 
-            Serial.println("  ACURITE_MSGTYPE_5N1_WINDSPEED_WINDDIR_RAINFALL");
             Serial.print("Wind Speed (MPH): ");
             Serial.print(Acurite_Decoder.getWindSpeed_mph());
             Serial.print("  Wind Direction: ");
@@ -114,7 +117,6 @@ void outputWeatherData(){
             Serial.println(Acurite_Decoder.getRainCounter());
             break;
         case ACURITE_MSGTYPE_5N1_WINDSPEED_TEMP_HUMIDITY:
-            Serial.println("  ACURITE_MSGTYPE_5N1_WINDSPEED_TEMP_HUMIDITY");
             Serial.print("Wind Speed (MPH): ");
             Serial.println(Acurite_Decoder.getWindSpeed_mph());
             Serial.print("Temperature: ");
@@ -122,10 +124,41 @@ void outputWeatherData(){
             Serial.print(" Humidity: ");
             Serial.println(Acurite_Decoder.getHumidity());
             break;
-        default: 
-            Serial.println("  Unknown Message Type Received");
-            break;
     }
+}
+*/
+void populateWeatherDataBuffer(){
+
+//    char    buffer[30];
+/*
+    char    strChannel;         c
+    char[2] strMessageType;     x
+    char    strSequenceNum;     u
+    char    strBatteryLow;      c
+    char[5] strTemp;            +04d
+    char[3] strWindSpeed;       03u
+    char[3] strRainFall;        +04d
+    char[4] strSensorID;        04u
+    char[2] strHumidity;        02u
+    char[3] strWindDirection;   3
+*/
+
+    sprintf(weatherBuffer[currentBufferIDX].buffer,"%c%x%u%c%+04d%03u%+04d%04u%02u%3s",
+        Acurite_Decoder.getChannel(),
+        Acurite_Decoder.getMessageType(),
+        Acurite_Decoder.getSequenceNum(),
+        Acurite_Decoder.getBatteryLow(),
+        Acurite_Decoder.getTemp(),
+        Acurite_Decoder.getWindSpeed_mph(),
+        Acurite_Decoder.getRainFall(),
+        Acurite_Decoder.getSensorID(),
+        Acurite_Decoder.getHumidity(),
+        Acurite_Decoder.getWindDirectionStr()
+    );
+}
+
+void i2cRequestEvent(){
+    Wire.write(weatherBuffer[safeBufferIDX].buffer);
 }
 
 void setup () {
@@ -143,19 +176,28 @@ void setup () {
 }
 
 void loop () {
-    bool firstPulse;
-    byte msgCounter=4;
+    bool firstPass = true;
+    bool bufferFlag = false;
 
-    runPulseDecoders(pulse_width,firstPulse);
+    runPulseDecoders(pulse_width);
 
-    if (firstPulse)
-        msgCounter = 1;
-    
-    if (msgCounter > 2) {
-        for (int i = 0;i < 3;i++) {
-            if (Acurite_Decoder.processMessage()) {
-                outputWeatherDataFast();
-            }
+    if (Acurite_Decoder.processMessage()) {
+        switch (bufferFlag) {
+            case true: 
+                currentBufferIDX = 1;
+                safeBufferIDX = 0;
+                break;
+            case false:
+                currentBufferIDX = 0;
+                safeBufferIDX = 1;
+                break;
+        }
+        bufferFlag = !bufferFlag;
+        populateWeatherDataBuffer();
+        if (firstPass) {
+            firstPass = false;
+            Wire.begin(I2C_ADDRESS);
+            Wire.onRequest(i2cRequestEvent);
         }
     }
 }
